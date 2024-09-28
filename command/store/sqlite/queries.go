@@ -1,8 +1,8 @@
-package store
+package sqlite
 
 // table creation
 const (
-	commandTableQuery = `
+	CommandTableQuery = `
 	CREATE TABLE IF NOT EXISTS commands (
 		uuid VARCHAR(16) PRIMARY KEY,
 		name VARCHAR(64) NOT NULL,
@@ -10,7 +10,7 @@ const (
 		command VARCHAR(255) NOT NULL
 	)`
 
-	parametersTableQuery = `
+	ParametersTableQuery = `
 	CREATE TABLE IF NOT EXISTS parameters (
 		uuid VARCHAR(16) PRIMARY KEY,
 		command VARCHAR(16),
@@ -20,12 +20,12 @@ const (
 	)`
 
 	// TODO: thing more regarding this part
-	tagsTableQuery = `
+	TagsTableQuery = `
 	CREATE TABLE IF NOT EXISTS tags (
 		tag VARCHAR(16) PRIMARY KEY
 	)`
 
-	tagsAndCommandsTableQuery = `
+	TagsAndCommandsTableQuery = `
 	CREATE TABLE IF NOT EXISTS tags_commands (
 		tag VARCHAR(16),
 		command VARCHAR(16),
@@ -33,15 +33,17 @@ const (
 	)`
 )
 
-// insert queries
+// queries
 const (
-	insertCommandQuery = `
+	InsertCommandQuery = `
 	INSERT INTO 
 		commands(uuid, name, description, command) 
 	VALUES (?, ?, ?, ?)`
 
-	insertParameterPartialQuery = `
+	InsertParameterPartialQuery = `
 	INSERT INTO 
 		parameters(uuid, command, name, description, value)
 	VALUES %s`
+
+	SelectAllCommandsQuery = `SELECT uuid, name, description, command FROM commands`
 )

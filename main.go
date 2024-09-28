@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/lian_rr/keep/command"
+	"github.com/lian_rr/keep/command/app"
 	"github.com/lian_rr/keep/command/store"
 )
 
@@ -34,23 +36,27 @@ func run() error {
 		storePath = path
 	}
 
-	var storeOpts []store.LocalOpts
-	if storePath != "" {
-		storeOpts = append(storeOpts, store.WithPath(storePath))
-	}
-
 	logger, close, err := initLogger()
 	if err != nil {
 		return err
 	}
 	defer close()
 
-	store, cancel, err := store.NewLocal(ctx, logger, storeOpts...)
+	cfg, err := app.New(ctx, storePath)
+	if err != nil {
+		return err
+	}
+
+	store, err := store.NewSql(logger, store.WithSqliteDriver(ctx, cfg.BasePath))
 	if err != nil {
 		slog.Error("error initializing the local store", slog.Any("error", err))
 		return err
 	}
-	defer cancel()
+	defer func() {
+		if err := store.Close(); err != nil {
+			logger.Warn("error closing store", slog.Any("error", err))
+		}
+	}()
 
 	id, _ := uuid.NewV6()
 	cmd, err := command.New(id, "test command", "command for testing 2", "echo '{{.text}} - {{.text2}}'")
@@ -58,7 +64,18 @@ func run() error {
 		return nil
 	}
 
-	store.Store(ctx, cmd)
+	if err := store.Store(ctx, cmd); err != nil {
+		return err
+	}
+
+	commands, err := store.ListCommands(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, cmd := range commands {
+		fmt.Println(cmd)
+	}
 
 	return nil
 }

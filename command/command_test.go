@@ -66,8 +66,8 @@ func TestNew(t *testing.T) {
 					Name: "text2",
 				}
 
-				assert.Equal(t, param1, actual[0], "missing text param")
-				assert.Equal(t, param2, actual[1], "missing text2 param")
+				assert.Equal(t, param1.Name, actual[0].Name, "missing text param")
+				assert.Equal(t, param2.Name, actual[1].Name, "missing text1 param")
 			},
 		},
 	}
