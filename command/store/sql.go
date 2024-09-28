@@ -8,13 +8,18 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/lian_rr/keep/command"
 	"github.com/lian_rr/keep/command/store/sqlite"
 )
 
-type sqlOptFunc func(store *Sql) error
+// ErrNotFound used when the searched element wasn't found.
+var ErrNotFound = errors.New("not found")
+
+// SqlOptFunc optional functions for Sql store.
+type SqlOptFunc func(store *Sql) error
 
 // Sql store
 type Sql struct {
@@ -23,7 +28,7 @@ type Sql struct {
 }
 
 // NewSql returns a new SQL store.
-func NewSql(logger *slog.Logger, opts ...sqlOptFunc) (Sql, error) {
+func NewSql(logger *slog.Logger, opts ...SqlOptFunc) (Sql, error) {
 	store := Sql{
 		logger: logger,
 	}
@@ -42,7 +47,7 @@ func NewSql(logger *slog.Logger, opts ...sqlOptFunc) (Sql, error) {
 }
 
 // Store stores a command on the sql store.
-func (s Sql) Store(ctx context.Context, cmd command.Command) error {
+func (s *Sql) Store(ctx context.Context, cmd command.Command) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
@@ -89,7 +94,7 @@ func (s Sql) Store(ctx context.Context, cmd command.Command) error {
 
 // ListCommands returns a list of all the commands
 func (s *Sql) ListCommands(ctx context.Context) ([]command.Command, error) {
-	rows, err := s.db.QueryContext(ctx, sqlite.SelectAllCommandsQuery)
+	rows, err := s.db.QueryContext(ctx, sqlite.GetAllCommandsQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -113,13 +118,43 @@ func (s *Sql) ListCommands(ctx context.Context) ([]command.Command, error) {
 	return cmds, nil
 }
 
+// GetCommandByID returns a command. If the command doesn't exists, returns an ErrNotFound error.
+func (s *Sql) GetCommandByID(ctx context.Context, id uuid.UUID) (command.Command, error) {
+	row := s.db.QueryRowContext(ctx, sqlite.GetCommandbyIDQuery, id.String())
+	var cmd command.Command
+	if err := row.Scan(&cmd.ID, &cmd.Name, &cmd.Description, &cmd.Command); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return command.Command{}, ErrNotFound
+		}
+		return command.Command{}, err
+	}
+
+	rows, err := s.db.QueryContext(ctx, sqlite.GetParametersByCommandID, id.String())
+	if err != nil {
+		return command.Command{}, err
+	}
+
+	params := make([]command.Parameter, 0)
+	for rows.Next() {
+		var param command.Parameter
+		if err := rows.Scan(&param.ID, &param.Name, &param.Description, &param.DefaultValue); err != nil {
+			return command.Command{}, err
+		}
+
+		params = append(params, param)
+	}
+
+	cmd.Params = params
+	return cmd, nil
+}
+
 // Close closes the db driver.
 func (s *Sql) Close() error {
 	return s.db.Close()
 }
 
 // WithSqliteDriver returns a sqlOptFunc that sets the config necessary for a SQLite store.
-func WithSqliteDriver(ctx context.Context, path string) sqlOptFunc {
+func WithSqliteDriver(ctx context.Context, path string) SqlOptFunc {
 	return func(store *Sql) error {
 		if store.db != nil {
 			return errors.New("sql store already set")

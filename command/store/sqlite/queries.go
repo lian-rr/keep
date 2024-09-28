@@ -45,5 +45,19 @@ const (
 		parameters(uuid, command, name, description, value)
 	VALUES %s`
 
-	SelectAllCommandsQuery = `SELECT uuid, name, description, command FROM commands`
+	GetAllCommandsQuery = `
+	SELECT uuid, name, description, command 
+	FROM commands`
+
+	GetCommandbyIDQuery = `
+	SELECT 
+		uuid, name, description, command 
+	FROM commands
+	WHERE uuid = ?`
+
+	GetParametersByCommandID = `
+	SELECT 
+		uuid, name, description, value 
+	FROM commands
+	WHERE command = ?`
 )

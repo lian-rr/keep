@@ -24,13 +24,13 @@ import (
 func TestNewLocal(t *testing.T) {
 	tests := []struct {
 		name           string
-		driverFunc     func(db *sql.DB) sqlOptFunc
+		driverFunc     func(db *sql.DB) SqlOptFunc
 		expectedErrMsg string
 	}{
 		{
 			name:           "missing driver",
 			expectedErrMsg: "missing db connection",
-			driverFunc: func(_ *sql.DB) sqlOptFunc {
+			driverFunc: func(_ *sql.DB) SqlOptFunc {
 				return func(_ *Sql) error {
 					return nil
 				}
@@ -39,7 +39,7 @@ func TestNewLocal(t *testing.T) {
 		{
 			name:           "error executing opts",
 			expectedErrMsg: "mock error",
-			driverFunc: func(_ *sql.DB) sqlOptFunc {
+			driverFunc: func(_ *sql.DB) SqlOptFunc {
 				return func(_ *Sql) error {
 					return errors.New("mock error")
 				}
@@ -47,7 +47,7 @@ func TestNewLocal(t *testing.T) {
 		},
 		{
 			name: "happy path",
-			driverFunc: func(db *sql.DB) sqlOptFunc {
+			driverFunc: func(db *sql.DB) SqlOptFunc {
 				return func(store *Sql) error {
 					store.db = db
 					return nil
@@ -264,6 +264,209 @@ func TestSql_Store(t *testing.T) {
 			}
 
 			assert.NoError(t, err, "unexpected error")
+		})
+	}
+}
+
+func TestSql_ListCommands(t *testing.T) {
+	mockErr := errors.New("mock err")
+
+	id, err := uuid.NewV6()
+	require.NoError(t, err)
+	id2, err := uuid.NewV6()
+	require.NoError(t, err)
+	id3, err := uuid.NewV6()
+	require.NoError(t, err)
+
+	cmds := []command.Command{
+		{
+			ID:          id,
+			Name:        "test command",
+			Description: "command used for testing",
+			Command:     "echo '{{text}} - {{text2}}'",
+		},
+		{
+			ID:          id2,
+			Name:        "kill process running on port",
+			Description: "kills the process running on the provided port",
+			Command:     "lsof -t -i:{{port}} | xargs kill",
+		},
+		{
+			ID:          id3,
+			Name:        "Squash the last N commits",
+			Description: "Squash the last N number of commits",
+			Command:     "git reset --soft HEAD~num_commits && git commit",
+		},
+	}
+
+	tests := []struct {
+		name             string
+		expectedErrorMsg string
+		setMockCalls     func(mock sqlmock.Sqlmock)
+		expectedOut      []command.Command
+	}{
+		{
+			name:             "unexpected error getting command",
+			expectedErrorMsg: mockErr.Error(),
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(sqlite.GetAllCommandsQuery).WillReturnError(mockErr)
+			},
+		},
+		{
+			name:        "command found",
+			expectedOut: cmds,
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows([]string{"uuid", "name", "description", "command"})
+				for _, cmd := range cmds {
+					rows.AddRow(cmd.ID, cmd.Name, cmd.Description, cmd.Command)
+				}
+
+				mock.ExpectQuery(sqlite.GetAllCommandsQuery).
+					WillReturnRows(rows)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+
+			if tt.setMockCalls != nil {
+				tt.setMockCalls(mock)
+			}
+
+			store := Sql{
+				db: db,
+			}
+
+			got, err := store.ListCommands(context.Background())
+
+			assert.NoError(t, mock.ExpectationsWereMet(), "expectations not met")
+			if tt.expectedErrorMsg != "" {
+				assert.ErrorContains(t, err, tt.expectedErrorMsg, "error not the expected")
+				return
+			}
+
+			assert.NoError(t, err, "unexpected error")
+			assert.Equal(t, tt.expectedOut, got, "command not the expected")
+		})
+	}
+}
+
+func TestSql_GetCommandByID(t *testing.T) {
+	mockErr := errors.New("mock err")
+
+	id, err := uuid.NewV6()
+	require.NoError(t, err)
+	paramID1, err := uuid.NewV6()
+	require.NoError(t, err)
+	paramID2, err := uuid.NewV6()
+	require.NoError(t, err)
+
+	cmd := command.Command{
+		ID:          id,
+		Name:        "test command",
+		Description: "command used for testing",
+		Command:     "echo '{{text}} - {{text2}}'",
+		Params: []command.Parameter{
+			{
+				ID:           paramID1,
+				Name:         "text",
+				Description:  "text param 1",
+				DefaultValue: "hello",
+			},
+			{
+				ID:           paramID2,
+				Name:         "text2",
+				Description:  "text param 2",
+				DefaultValue: "bye",
+			},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		expectedErrorMsg string
+		setMockCalls     func(mock sqlmock.Sqlmock)
+		expectedOut      command.Command
+	}{
+		{
+			name:             "unexpected error getting command",
+			expectedErrorMsg: mockErr.Error(),
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(sqlite.GetCommandbyIDQuery).WillReturnError(mockErr)
+			},
+		},
+		{
+			name:             "not found command",
+			expectedErrorMsg: ErrNotFound.Error(),
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(sqlite.GetCommandbyIDQuery).WillReturnError(sql.ErrNoRows)
+			},
+		},
+		{
+			name:             "error getting params",
+			expectedErrorMsg: mockErr.Error(),
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows([]string{"uuid", "name", "description", "command"}).
+					AddRow(cmd.ID, cmd.Name, cmd.Description, cmd.Command)
+
+				mock.ExpectQuery(sqlite.GetCommandbyIDQuery).
+					WithArgs(id.String()).
+					WillReturnRows(rows)
+
+				mock.ExpectQuery(sqlite.GetParametersByCommandID).
+					WithArgs(id.String()).
+					WillReturnError(mockErr)
+			},
+		},
+		{
+			name:        "command found",
+			expectedOut: cmd,
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows([]string{"uuid", "name", "description", "command"}).
+					AddRow(cmd.ID, cmd.Name, cmd.Description, cmd.Command)
+
+				mock.ExpectQuery(sqlite.GetCommandbyIDQuery).
+					WithArgs(id.String()).
+					WillReturnRows(rows)
+
+				rows = sqlmock.NewRows([]string{"uuid", "name", "description", "value"})
+				for _, param := range cmd.Params {
+					rows.AddRow(param.ID, param.Name, param.Description, param.DefaultValue)
+				}
+
+				mock.ExpectQuery(sqlite.GetParametersByCommandID).
+					WithArgs(id.String()).
+					WillReturnRows(rows)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+
+			if tt.setMockCalls != nil {
+				tt.setMockCalls(mock)
+			}
+
+			store := Sql{
+				db: db,
+			}
+
+			got, err := store.GetCommandByID(context.Background(), id)
+
+			assert.NoError(t, mock.ExpectationsWereMet(), "expectations not met")
+			if tt.expectedErrorMsg != "" {
+				assert.ErrorContains(t, err, tt.expectedErrorMsg, "error not the expected")
+				return
+			}
+
+			assert.NoError(t, err, "unexpected error")
+			assert.Equal(t, tt.expectedOut, got, "command not the expected")
 		})
 	}
 }
