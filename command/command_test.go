@@ -9,9 +9,6 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	id1, err := uuid.NewV6()
-	require.NoError(t, err)
-
 	textParam := Parameter{
 		Name:         "text",
 		Description:  "text to echo",
@@ -41,7 +38,6 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:        "with params - happy path",
-			id:          id1,
 			commandName: "test command",
 			desc:        "command for testing",
 			raw:         "echo '{{.text}}'",
@@ -53,7 +49,6 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:        "parsing params - happy path",
-			id:          id1,
 			commandName: "test command 2",
 			desc:        "command for testing 2",
 			raw:         "echo '{{.text}} - {{.text2}}'",
@@ -79,7 +74,7 @@ func TestNew(t *testing.T) {
 				opts = append(opts, WithParams(tt.params))
 			}
 
-			cmd, err := New(tt.id, tt.commandName, tt.desc, tt.raw, opts...)
+			cmd, err := New(tt.commandName, tt.desc, tt.raw, opts...)
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, err, tt.expectedError, "error not the expected")
 				return
@@ -87,7 +82,6 @@ func TestNew(t *testing.T) {
 
 			assert.NoError(t, err, "unexpected error")
 
-			assert.Equal(t, tt.id.ID(), cmd.ID.ID(), "id not the expected")
 			assert.Equal(t, tt.commandName, cmd.Name, "name not the expected")
 			assert.Equal(t, tt.desc, cmd.Description, "description not the expected")
 			assert.Equal(t, tt.raw, cmd.Command, "command not the expected")

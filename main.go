@@ -8,8 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/google/uuid"
-
 	"github.com/lian_rr/keep/app"
 	"github.com/lian_rr/keep/command"
 	"github.com/lian_rr/keep/command/store"
@@ -58,8 +56,7 @@ func run() error {
 		}
 	}()
 
-	id, _ := uuid.NewV6()
-	cmd, err := command.New(id, "test command", "command for testing 2", "echo '{{.text}} - {{.text2}}'")
+	cmd, err := command.New("test command", "command for testing 2", "echo '{{.text}} - {{.text2}}'")
 	if err != nil {
 		return nil
 	}

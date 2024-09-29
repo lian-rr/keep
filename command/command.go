@@ -44,7 +44,12 @@ type (
 type cmdOpt func(*Command) error
 
 // New returns a new Command.
-func New(id uuid.UUID, name string, desc string, cmd string, opts ...cmdOpt) (Command, error) {
+func New(name string, desc string, cmd string, opts ...cmdOpt) (Command, error) {
+	id, err := uuid.NewV6()
+	if err != nil {
+		return Command{}, err
+	}
+
 	cont := Command{
 		ID:          id,
 		Name:        name,
