@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/lian_rr/keep/app"
 	"github.com/lian_rr/keep/command"
-	"github.com/lian_rr/keep/command/app"
 	"github.com/lian_rr/keep/command/store"
 )
 
