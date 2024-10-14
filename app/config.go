@@ -5,21 +5,24 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 )
 
-type Config struct {
+// App holds the application configuration
+type App struct {
 	BasePath string
 }
 
 // ErrInvalidDir indicates that the root directory for the store is not valid.
 var ErrInvalidDir = errors.New("invalid base directory")
 
-func New(ctx context.Context, path string) (Config, error) {
+// New returns a new app.
+func New(ctx context.Context, path string, logger *slog.Logger) (App, error) {
 	if path == "" {
 		def, err := os.UserHomeDir()
 		if err != nil {
-			return Config{}, err
+			return App{}, err
 		}
 		path = def
 	}
@@ -27,10 +30,11 @@ func New(ctx context.Context, path string) (Config, error) {
 
 	err := os.Mkdir(path, 0o740)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
-		return Config{}, fmt.Errorf("%w: %w", ErrInvalidDir, err)
+		return App{}, fmt.Errorf("%w: %w", ErrInvalidDir, err)
 	}
 
-	return Config{
+	logger.Info("application setup completed", slog.String("path", path))
+	return App{
 		BasePath: path,
 	}, nil
 }

@@ -75,14 +75,14 @@ func TestNewLocal(t *testing.T) {
 	}
 }
 
-func TestSql_Store(t *testing.T) {
-	id, err := uuid.NewV6()
+func TestSql_Save(t *testing.T) {
+	id, err := uuid.NewV7()
 	require.NoError(t, err)
 
-	paramID1, err := uuid.NewV6()
+	paramID1, err := uuid.NewV7()
 	require.NoError(t, err)
 
-	paramID2, err := uuid.NewV6()
+	paramID2, err := uuid.NewV7()
 	require.NoError(t, err)
 
 	cmd := command.Command{
@@ -252,7 +252,7 @@ func TestSql_Store(t *testing.T) {
 				db:     db,
 			}
 
-			err = store.Store(context.Background(), tt.cmd)
+			err = store.Save(context.Background(), tt.cmd)
 			if tt.validateLogs != nil {
 				tt.validateLogs(buf)
 			}
@@ -271,11 +271,11 @@ func TestSql_Store(t *testing.T) {
 func TestSql_ListCommands(t *testing.T) {
 	mockErr := errors.New("mock err")
 
-	id, err := uuid.NewV6()
+	id, err := uuid.NewV7()
 	require.NoError(t, err)
-	id2, err := uuid.NewV6()
+	id2, err := uuid.NewV7()
 	require.NoError(t, err)
-	id3, err := uuid.NewV6()
+	id3, err := uuid.NewV7()
 	require.NoError(t, err)
 
 	cmds := []command.Command{
@@ -357,11 +357,11 @@ func TestSql_ListCommands(t *testing.T) {
 func TestSql_GetCommandByID(t *testing.T) {
 	mockErr := errors.New("mock err")
 
-	id, err := uuid.NewV6()
+	id, err := uuid.NewV7()
 	require.NoError(t, err)
-	paramID1, err := uuid.NewV6()
+	paramID1, err := uuid.NewV7()
 	require.NoError(t, err)
-	paramID2, err := uuid.NewV6()
+	paramID2, err := uuid.NewV7()
 	require.NoError(t, err)
 
 	cmd := command.Command{
@@ -458,6 +458,95 @@ func TestSql_GetCommandByID(t *testing.T) {
 			}
 
 			got, err := store.GetCommandByID(context.Background(), id)
+
+			assert.NoError(t, mock.ExpectationsWereMet(), "expectations not met")
+			if tt.expectedErrorMsg != "" {
+				assert.ErrorContains(t, err, tt.expectedErrorMsg, "error not the expected")
+				return
+			}
+
+			assert.NoError(t, err, "unexpected error")
+			assert.Equal(t, tt.expectedOut, got, "command not the expected")
+		})
+	}
+}
+
+func TestSql_SearchCommand(t *testing.T) {
+	mockErr := errors.New("mock err")
+
+	id, err := uuid.NewV7()
+	require.NoError(t, err)
+	id2, err := uuid.NewV7()
+	require.NoError(t, err)
+	id3, err := uuid.NewV7()
+	require.NoError(t, err)
+
+	cmds := []command.Command{
+		{
+			ID:          id,
+			Name:        "test command",
+			Description: "command used for testing",
+			Command:     "echo '{{text}} - {{text2}}'",
+		},
+		{
+			ID:          id2,
+			Name:        "kill process running on port",
+			Description: "kills the process running on the provided port",
+			Command:     "lsof -t -i:{{port}} | xargs kill",
+		},
+		{
+			ID:          id3,
+			Name:        "Squash the last N commits",
+			Description: "Squash the last N number of commits",
+			Command:     "git reset --soft HEAD~num_commits && git commit",
+		},
+	}
+
+	tests := []struct {
+		name             string
+		expectedErrorMsg string
+		searchTerm       string
+		setMockCalls     func(mock sqlmock.Sqlmock)
+		expectedOut      []command.Command
+	}{
+		{
+			name:             "unexpected error getting command",
+			searchTerm:       "test",
+			expectedErrorMsg: mockErr.Error(),
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(sqlite.SearchCommandQuery).WillReturnError(mockErr)
+			},
+		},
+		{
+			name:        "commands found",
+			expectedOut: cmds,
+			searchTerm:  "whatever",
+			setMockCalls: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows([]string{"uuid", "name", "description", "command"})
+				for _, cmd := range cmds {
+					rows.AddRow(cmd.ID, cmd.Name, cmd.Description, cmd.Command)
+				}
+
+				mock.ExpectQuery(sqlite.SearchCommandQuery).
+					WillReturnRows(rows)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+
+			if tt.setMockCalls != nil {
+				tt.setMockCalls(mock)
+			}
+
+			store := Sql{
+				db: db,
+			}
+
+			got, err := store.SearchCommand(context.Background(), tt.searchTerm)
 
 			assert.NoError(t, mock.ExpectationsWereMet(), "expectations not met")
 			if tt.expectedErrorMsg != "" {

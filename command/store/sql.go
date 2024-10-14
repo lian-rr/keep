@@ -46,8 +46,8 @@ func NewSql(logger *slog.Logger, opts ...SqlOptFunc) (Sql, error) {
 	return store, nil
 }
 
-// Store stores a command on the sql store.
-func (s *Sql) Store(ctx context.Context, cmd command.Command) error {
+// Save stores a command on the sql store.
+func (s *Sql) Save(ctx context.Context, cmd command.Command) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
@@ -148,6 +148,32 @@ func (s *Sql) GetCommandByID(ctx context.Context, id uuid.UUID) (command.Command
 	return cmd, nil
 }
 
+// SearchCommand returns a list of the commands with the matching term.
+func (s *Sql) SearchCommand(ctx context.Context, term string) ([]command.Command, error) {
+	rows, err := s.db.QueryContext(ctx, sqlite.SearchCommandQuery, term)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			s.logger.Warn("error closing rows when listing commands", slog.Any("error", err))
+		}
+	}()
+
+	cmds := make([]command.Command, 0)
+	for rows.Next() {
+		var cmd command.Command
+		if err := rows.Scan(&cmd.ID, &cmd.Name, &cmd.Description, &cmd.Command); err != nil {
+			return nil, err
+		}
+
+		cmds = append(cmds, cmd)
+	}
+
+	return cmds, nil
+}
+
 // Close closes the db driver.
 func (s *Sql) Close() error {
 	return s.db.Close()
@@ -180,8 +206,10 @@ func WithSqliteDriver(ctx context.Context, path string) SqlOptFunc {
 		queries := []string{
 			sqlite.CommandTableQuery,
 			sqlite.ParametersTableQuery,
-			sqlite.TagsTableQuery,
-			sqlite.TagsAndCommandsTableQuery,
+			sqlite.SearchTableQuery,
+			sqlite.InsertCommandFtsTrigger,
+			sqlite.UpdateCommandFtsTrigger,
+			sqlite.DeleteCommandFtsTrigger,
 		}
 
 		for _, query := range queries {

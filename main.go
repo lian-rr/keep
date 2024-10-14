@@ -40,7 +40,7 @@ func run() error {
 	}
 	defer close()
 
-	cfg, err := app.New(ctx, storePath)
+	cfg, err := app.New(ctx, storePath, logger)
 	if err != nil {
 		return err
 	}
@@ -61,11 +61,29 @@ func run() error {
 		return nil
 	}
 
-	if err := store.Store(ctx, cmd); err != nil {
+	if err := store.Save(ctx, cmd); err != nil {
 		return err
 	}
 
-	commands, err := store.ListCommands(ctx)
+	cmd, err = command.New("Kill the process running on port", "command for killing the process that is running in a port", "lsof -t -i:{{port}} | xargs kill")
+	if err != nil {
+		return nil
+	}
+
+	if err := store.Save(ctx, cmd); err != nil {
+		return err
+	}
+
+	// commands, err := store.ListCommands(ctx)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// for _, cmd := range commands {
+	// 	fmt.Println(cmd)
+	// }
+
+	commands, err := store.SearchCommand(ctx, "port")
 	if err != nil {
 		return err
 	}
