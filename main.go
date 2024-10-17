@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/lian_rr/keep/app"
-	"github.com/lian_rr/keep/command"
 	"github.com/lian_rr/keep/command/store"
+	"github.com/lian_rr/keep/tui"
 )
 
 const (
@@ -53,43 +52,18 @@ func run() error {
 	defer func() {
 		if err := store.Close(); err != nil {
 			logger.Warn("error closing store", slog.Any("error", err))
+			return
 		}
+		logger.Debug("Store closed successfully")
 	}()
 
-	cmd, err := command.New("test command", "command for testing 2", "echo '{{.text}} - {{.text2}}'")
-	if err != nil {
-		return nil
-	}
-
-	if err := store.Save(ctx, cmd); err != nil {
-		return err
-	}
-
-	cmd, err = command.New("Kill the process running on port", "command for killing the process that is running in a port", "lsof -t -i:{{port}} | xargs kill")
-	if err != nil {
-		return nil
-	}
-
-	if err := store.Save(ctx, cmd); err != nil {
-		return err
-	}
-
-	// commands, err := store.ListCommands(ctx)
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// for _, cmd := range commands {
-	// 	fmt.Println(cmd)
-	// }
-
-	commands, err := store.SearchCommand(ctx, "port")
+	ui, err := tui.New(ctx, logger)
 	if err != nil {
 		return err
 	}
 
-	for _, cmd := range commands {
-		fmt.Println(cmd)
+	if err := ui.Start(); err != nil {
+		return err
 	}
 
 	return nil
