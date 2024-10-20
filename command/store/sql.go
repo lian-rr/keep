@@ -28,19 +28,19 @@ type Sql struct {
 }
 
 // NewSql returns a new SQL store.
-func NewSql(logger *slog.Logger, opts ...SqlOptFunc) (Sql, error) {
-	store := Sql{
+func NewSql(logger *slog.Logger, opts ...SqlOptFunc) (*Sql, error) {
+	store := &Sql{
 		logger: logger,
 	}
 
 	for _, opt := range opts {
-		if err := opt(&store); err != nil {
-			return Sql{}, err
+		if err := opt(store); err != nil {
+			return nil, err
 		}
 	}
 
 	if store.db == nil {
-		return Sql{}, errors.New("missing db connection")
+		return nil, errors.New("missing db connection")
 	}
 
 	return store, nil
@@ -210,6 +210,8 @@ func WithSqliteDriver(ctx context.Context, path string) SqlOptFunc {
 			sqlite.InsertCommandFtsTrigger,
 			sqlite.UpdateCommandFtsTrigger,
 			sqlite.DeleteCommandFtsTrigger,
+			// testCommands,
+			// testParams,
 		}
 
 		for _, query := range queries {
@@ -229,3 +231,51 @@ func WithSqliteDriver(ctx context.Context, path string) SqlOptFunc {
 		return nil
 	}
 }
+
+var testCommands = `
+	INSERT INTO commands (id, name, description, command) VALUES 
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537a5', 'CreateUser', 'Creates a new user in the system', 'useradd {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537a6', 'DeleteUser', 'Removes a user from the system', 'userdel {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537a7', 'UpdateUser', 'Updates user information', 'usermod -c "{{.info}}" {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537a8', 'ListUsers', 'Retrieves a list of all users', 'cat /etc/passwd | grep {{.filter}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537a9', 'GetUser', 'Fetches details of a specific user', 'getent passwd {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537aa', 'ChangePassword', 'Updates the password for a user', 'passwd {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537ab', 'LockUser', 'Locks a user account to prevent access', 'usermod -L {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537ac', 'UnlockUser', 'Unlocks a previously locked user account', 'usermod -U {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537ad', 'GetLogs', 'Retrieves system logs for audit purposes', 'journalctl -xe --user {{.username}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537ae', 'SystemStatus', 'Checks the current status of the system', 'systemctl status {{.service}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537af', 'BackupDatabase', 'Backs up the specified database', 'pg_dump {{.database}} -f {{.output}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b0', 'RestoreDatabase', 'Restores the specified database from a backup', 'psql {{.database}} < {{.backup}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b1', 'CheckDiskSpace', 'Checks the disk space usage', 'df -h {{.path}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b2', 'StartService', 'Starts a specified service', 'systemctl start {{.service}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b3', 'StopService', 'Stops a specified service', 'systemctl stop {{.service}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b4', 'CheckServiceStatus', 'Checks the status of a specified service', 'systemctl status {{.service}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b5', 'CreateDirectory', 'Creates a new directory', 'mkdir -p {{.path}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b6', 'DeleteFile', 'Deletes a specified file', 'rm -f {{.filename}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b7', 'MoveFile', 'Moves a file to a new location', 'mv {{.source}} {{.destination}}'),
+	('7f5f4b38-59ef-7e3c-8d6d-73e60c9537b8', 'CopyFile', 'Copies a file to a new location', 'cp {{.source}} {{.destination}}')
+`
+
+var testParams = `
+	INSERT INTO parameters (id, command, name, description, value) VALUES 
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537a5', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537a5', 'username', 'The name of the user to create', 'newuser'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537a6', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537a6', 'username', 'The name of the user to delete', 'olduser'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537a7', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537a7', 'info', 'New information for the user', 'Updated info'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537a8', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537a8', 'filter', 'Pattern to filter the user list', '*'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537a9', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537a9', 'username', 'The name of the user to fetch', 'specificuser'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537aa', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537aa', 'username', 'The name of the user to change password', 'changeme'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537ab', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537ab', 'username', 'The name of the user to lock', 'lockeduser'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537ac', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537ac', 'username', 'The name of the user to unlock', 'unlockeduser'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537ad', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537ad', 'username', 'The name of the user to get logs for', 'loggeruser'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537ae', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537ae', 'service', 'The name of the service to check status', 'myservice'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537af', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537af', 'database', 'The name of the database to back up', 'mydatabase'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b0', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b0', 'database', 'The name of the database to restore', 'mydatabase'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b1', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b1', 'path', 'The path to check disk space', '/'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b2', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b2', 'service', 'The name of the service to start', 'myservice'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b3', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b3', 'service', 'The name of the service to stop', 'myservice'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b4', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b4', 'service', 'The name of the service to check', 'myservice'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b5', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b5', 'path', 'The path for the new directory', '/new/directory'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b6', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b6', 'filename', 'The name of the file to delete', 'file.txt'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b7', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b7', 'source', 'The source file to move', 'file.txt'),
+	('1c3a5500-59ef-7e3c-8d6d-73e60c9537b8', '7f5f4b38-59ef-7e3c-8d6d-73e60c9537b8', 'source', 'The source file to copy', 'file.txt')
+`

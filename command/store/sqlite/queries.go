@@ -94,7 +94,7 @@ const (
 	GetParametersByCommandID = `
 	SELECT 
 		id, name, description, value 
-	FROM commands
+	FROM parameters
 	WHERE command = ?`
 
 	SearchCommandQuery = `
