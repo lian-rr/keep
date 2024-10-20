@@ -11,6 +11,7 @@ type store interface {
 	Save(context.Context, Command) error
 	GetCommandByID(context.Context, uuid.UUID) (Command, error)
 	SearchCommand(context.Context, string) ([]Command, error)
+	ListCommands(context.Context) ([]Command, error)
 }
 
 // Manager handles the command admin operations.
@@ -61,6 +62,16 @@ func (m *Manager) GetOne(ctx context.Context, rawID string) (Command, error) {
 // SearchCommand returns a list of commands with a matching term.
 func (m *Manager) Search(ctx context.Context, term string) ([]Command, error) {
 	commands, err := m.store.SearchCommand(ctx, term)
+	if err != nil {
+		return nil, err
+	}
+
+	return commands, nil
+}
+
+// GetAll returns a list with all the commands.
+func (m *Manager) GetAll(ctx context.Context) ([]Command, error) {
+	commands, err := m.store.ListCommands(ctx)
 	if err != nil {
 		return nil, err
 	}

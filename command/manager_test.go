@@ -212,6 +212,81 @@ func TestManager_Search(t *testing.T) {
 	}
 }
 
+func TestManager_GetAll(t *testing.T) {
+	mockErr := errors.New("mock error")
+	id, err := uuid.NewV7()
+	require.NoError(t, err)
+	id2, err := uuid.NewV7()
+	require.NoError(t, err)
+	id3, err := uuid.NewV7()
+	require.NoError(t, err)
+
+	testCmds := []Command{
+		{
+			ID:          id,
+			Name:        "test command",
+			Description: "this is a test command",
+			Command:     "echo 'hello world'",
+		},
+		{
+			ID:          id2,
+			Name:        "test command 2",
+			Description: "this is a test command 2",
+			Command:     "echo 'hello world 2'",
+		},
+		{
+			ID:          id3,
+			Name:        "test command 3",
+			Description: "this is a test command 3",
+			Command:     "echo 'hello world 3'",
+		},
+	}
+
+	tests := []struct {
+		name           string
+		expectedError  error
+		setExpectation func(mock *mockStore, ctx context.Context)
+	}{
+		{
+			name:          "store returned an error",
+			expectedError: mockErr,
+			setExpectation: func(testMock *mockStore, ctx context.Context) {
+				testMock.On("ListCommands", ctx).Return(nil, mockErr)
+			},
+		},
+		{
+			name: "happy path",
+			setExpectation: func(testMock *mockStore, ctx context.Context) {
+				testMock.On("ListCommands", ctx).Return(testCmds, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &mockStore{}
+			ctx := context.Background()
+
+			if tt.setExpectation != nil {
+				tt.setExpectation(store, ctx)
+			}
+
+			manager := Manager{
+				store: store,
+			}
+
+			cmds, err := manager.GetAll(ctx)
+			if tt.expectedError != nil {
+				assert.EqualError(t, err, tt.expectedError.Error(), "error not the expected")
+				return
+			}
+
+			assert.NoError(t, err, "unexpected error")
+			assert.Equal(t, testCmds, cmds, "cmd no the expected")
+		})
+	}
+}
+
 type mockStore struct {
 	mock.Mock
 }
@@ -234,6 +309,15 @@ func (m *mockStore) GetCommandByID(ctx context.Context, id uuid.UUID) (Command, 
 
 func (m *mockStore) SearchCommand(ctx context.Context, term string) ([]Command, error) {
 	args := m.Called(ctx, term)
+	cmds := args.Get(0)
+	if cmds == nil {
+		return nil, args.Error(1)
+	}
+	return cmds.([]Command), args.Error(1)
+}
+
+func (m *mockStore) ListCommands(ctx context.Context) ([]Command, error) {
+	args := m.Called(ctx)
 	cmds := args.Get(0)
 	if cmds == nil {
 		return nil, args.Error(1)
