@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/lian_rr/keep/app"
+	"github.com/lian_rr/keep/command"
 	"github.com/lian_rr/keep/command/store"
 	"github.com/lian_rr/keep/tui"
 )
@@ -57,7 +58,13 @@ func run() error {
 		logger.Debug("Store closed successfully")
 	}()
 
-	ui, err := tui.New(ctx, logger)
+	manager, err := command.NewManager(store)
+	if err != nil {
+		slog.Error("error starting command manager", slog.Any("error", err))
+		return err
+	}
+
+	ui, err := tui.New(ctx, manager, logger)
 	if err != nil {
 		return err
 	}
@@ -71,9 +78,9 @@ func run() error {
 
 func initLogger() (logger *slog.Logger, close func() error, err error) {
 	logLevel := slog.LevelInfo
-	if _, ok := os.LookupEnv(debugLogger); ok {
-		logLevel = slog.LevelDebug
-	}
+	// if _, ok := os.LookupEnv(debugLogger); ok {
+	logLevel = slog.LevelDebug
+	// }
 
 	file, err := os.OpenFile("/tmp/keep.log", os.O_APPEND|os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {

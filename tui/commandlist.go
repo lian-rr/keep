@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"errors"
+
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -14,7 +16,7 @@ type commandList struct {
 func newCommandList(title string, commands []command.Command) commandList {
 	items := make([]list.Item, 0, len(commands))
 	for _, cmd := range commands {
-		items = append(items, commandItem{
+		items = append(items, &commandItem{
 			title: cmd.Name,
 			desc:  cmd.Description,
 			cmd:   &cmd,
@@ -32,33 +34,34 @@ func newCommandList(title string, commands []command.Command) commandList {
 	}
 }
 
-func (l commandList) Update(msg tea.Msg) (commandList, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		var cmd tea.Cmd
-		l.list, cmd = l.list.Update(msg)
-		return l, cmd
-	default:
-		return l, nil
-	}
+func (l *commandList) Update(msg tea.Msg) (commandList, tea.Cmd) {
+	var cmd tea.Cmd
+	l.list, cmd = l.list.Update(msg)
+	return *l, cmd
 }
 
 func (l commandList) View() string {
 	return containerStyle.Render(l.list.View())
 }
 
-func (l commandList) Init() tea.Cmd {
-	return nil
-}
-
 func (l *commandList) SetSize(w, h int) {
 	l.list.SetSize(w, h)
 }
 
+func (l *commandList) selectedItem() (*commandItem, error) {
+	command, ok := l.list.SelectedItem().(*commandItem)
+	if !ok {
+		return nil, errors.New("invalid item selected")
+	}
+
+	return command, nil
+}
+
 type commandItem struct {
-	title string
-	desc  string
-	cmd   *command.Command
+	title  string
+	desc   string
+	cmd    *command.Command
+	loaded bool
 }
 
 var _ list.Item = (*commandItem)(nil)

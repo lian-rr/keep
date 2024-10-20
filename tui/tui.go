@@ -6,7 +6,14 @@ import (
 	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/lian_rr/keep/command"
 )
+
+type manager interface {
+	GetAll(context.Context) ([]command.Command, error)
+	GetOne(context.Context, string) (command.Command, error)
+}
 
 // Tui contains the TUI logic.
 type Tui struct {
@@ -14,8 +21,8 @@ type Tui struct {
 }
 
 // New returns a new TUI container.
-func New(ctx context.Context, logger *slog.Logger) (Tui, error) {
-	model, err := newMainModel(logger)
+func New(ctx context.Context, manager *command.Manager, logger *slog.Logger) (Tui, error) {
+	model, err := newModel(ctx, manager, logger)
 	if err != nil {
 		return Tui{}, fmt.Errorf("error starting the main model: %w", err)
 	}
