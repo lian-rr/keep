@@ -38,6 +38,11 @@ func newModel(ctx context.Context, manager manager, logger *slog.Logger) (*model
 
 	detail := newDetailCommand(logger)
 	if len(cmds) > 0 {
+		cmd, err := manager.GetOne(ctx, cmds[0].ID.String())
+		if err != nil {
+			return nil, err
+		}
+		cmds[0] = cmd
 		detail.SetContent(cmds[0])
 	}
 
@@ -80,15 +85,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	return docStyle.Render(borderStyle.Render(lipgloss.JoinVertical(lipgloss.Top,
-		borderStyle.Render(m.titleStyle.Render(title)),
-		borderStyle.Render(lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			borderStyle.Render(m.commands.View()),
-			borderStyle.Render(m.detailView.View()),
-		)),
-		helpStyle.Render(m.help.View(m.keys)),
-	)))
+	return docStyle.Render(
+		borderStyle.Render(
+			lipgloss.JoinVertical(
+				lipgloss.Top,
+				m.titleStyle.Render(title),
+				borderStyle.Render(lipgloss.JoinHorizontal(
+					lipgloss.Left,
+					m.commands.View(),
+					m.detailView.View(),
+				)),
+				helpStyle.Render(m.help.View(m.keys)),
+			)))
 }
 
 func (m *model) Init() tea.Cmd {
@@ -97,6 +105,7 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) updateComponentsDimensions(width, height int) {
+	m.logger.Debug("updating components dimensions")
 	w, _ := relativeDimensions(width, 0, .985, 0)
 	// title
 	m.titleStyle = m.titleStyle.Width(w)
@@ -104,12 +113,13 @@ func (m *model) updateComponentsDimensions(width, height int) {
 	// help
 	m.help.Width = w
 
-	// detail view
-	w, h := relativeDimensions(width, height, .83, .80)
-	m.detailView.SetSize(w, h)
-
+	w, h := relativeDimensions(width, height, .33, .90)
 	// command explorer
 	m.commands.SetSize(w, h)
+
+	// detail view
+	w, h = relativeDimensions(width, height, .80, .90)
+	m.detailView.SetSize(w, h)
 }
 
 func (m *model) inputRouter(msg tea.KeyMsg) tea.Cmd {

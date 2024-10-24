@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	chromaLang      = "bash"
+	chromaLang      = "fish"
 	chromaFormatter = "terminal16m"
 	chromaStyle     = "catppuccin-frappe"
 )
@@ -22,13 +22,18 @@ const (
 var paramHeaders = []string{
 	"name",
 	"description",
-	"value",
+	"default value",
 }
 
 type detailCommand struct {
 	view        viewport.Model
+	infoTable   *table.Table
 	paramsTable *table.Table
 	logger      *slog.Logger
+
+	// styles
+	titleStyle   lipgloss.Style
+	contentStyle lipgloss.Style
 }
 
 func newDetailCommand(logger *slog.Logger) detailCommand {
@@ -39,15 +44,36 @@ func newDetailCommand(logger *slog.Logger) detailCommand {
 		return data
 	}
 
-	tb := table.New().
+	vp := viewport.New(0, 0)
+	vp.Style = lipgloss.NewStyle().BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color(borderColor))
+
+	infoTable := table.New().Border(lipgloss.HiddenBorder()).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			style := lipgloss.NewStyle()
+
+			if col != 0 {
+				style = style.MarginLeft(2)
+			}
+
+			return style
+		})
+
+	params := table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("238"))).
 		Headers(capitalizeHeaders(paramHeaders)...)
 
 	return detailCommand{
-		paramsTable: tb,
-		view:        viewport.New(0, 0),
+		infoTable:   infoTable,
+		paramsTable: params,
+		view:        vp,
 		logger:      logger,
+		titleStyle:  titleStyle,
+		contentStyle: lipgloss.NewStyle().
+			Align(lipgloss.Center).
+			Padding(2, 8),
 	}
 }
 
@@ -65,17 +91,20 @@ func (dc *detailCommand) SetContent(cmd command.Command) error {
 
 	dc.paramsTable.Data(table.NewStringData(rows...))
 
-	content := containerStyle.Render(
-		lipgloss.JoinVertical(
-			lipgloss.Top,
-			cmd.Name,
-			cmd.Description,
-			b.String(),
-			lipgloss.NewStyle().
-				AlignHorizontal(lipgloss.Center).
-				Render(dc.paramsTable.Render()),
-		),
-	)
+	dc.infoTable.Data(table.NewStringData([][]string{
+		{labelStyle.Render("Title"), headerStyle.Render(cmd.Name)},
+		{labelStyle.Render("Description"), headerStyle.Render(cmd.Description)},
+		{labelStyle.Render("Command"), headerStyle.Render(b.String())},
+	}...))
+
+	content := dc.contentStyle.
+		Render(
+			lipgloss.JoinVertical(
+				lipgloss.Top,
+				dc.infoTable.Render(),
+				dc.paramsTable.Render(),
+			),
+		)
 
 	dc.view.SetContent(content)
 	return nil
@@ -86,7 +115,11 @@ func (dc *detailCommand) View() string {
 }
 
 func (dc *detailCommand) SetSize(width, height int) {
+	dc.titleStyle.Width(width)
+
 	dc.view.Width, dc.view.Height = width, height
 	w, _ := relativeDimensions(width, height, .50, .50)
+
 	dc.paramsTable.Width(w)
+	dc.logger.Debug("size set")
 }
