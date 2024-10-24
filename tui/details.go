@@ -25,7 +25,7 @@ var paramHeaders = []string{
 	"default value",
 }
 
-type detailCommand struct {
+type detailsView struct {
 	view        viewport.Model
 	infoTable   *table.Table
 	paramsTable *table.Table
@@ -36,7 +36,7 @@ type detailCommand struct {
 	contentStyle lipgloss.Style
 }
 
-func newDetailCommand(logger *slog.Logger) detailCommand {
+func newDetailsView(logger *slog.Logger) detailsView {
 	capitalizeHeaders := func(data []string) []string {
 		for i := range data {
 			data[i] = strings.ToUpper(data[i])
@@ -45,16 +45,18 @@ func newDetailCommand(logger *slog.Logger) detailCommand {
 	}
 
 	vp := viewport.New(0, 0)
-	vp.Style = lipgloss.NewStyle().BorderLeft(true).
+	vp.Style = lipgloss.NewStyle().
+		BorderLeft(true).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color(borderColor))
 
-	infoTable := table.New().Border(lipgloss.HiddenBorder()).
+	infoTable := table.New().
+		Border(lipgloss.HiddenBorder()).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			style := lipgloss.NewStyle()
 
 			if col != 0 {
-				style = style.MarginLeft(2)
+				style = style.MarginLeft(1)
 			}
 
 			return style
@@ -65,7 +67,7 @@ func newDetailCommand(logger *slog.Logger) detailCommand {
 		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("238"))).
 		Headers(capitalizeHeaders(paramHeaders)...)
 
-	return detailCommand{
+	return detailsView{
 		infoTable:   infoTable,
 		paramsTable: params,
 		view:        vp,
@@ -77,10 +79,9 @@ func newDetailCommand(logger *slog.Logger) detailCommand {
 	}
 }
 
-func (dc *detailCommand) SetContent(cmd command.Command) error {
+func (dc *detailsView) SetContent(cmd command.Command) error {
 	var b bytes.Buffer
-	err := quick.Highlight(&b, cmd.Command, chromaLang, chromaFormatter, chromaStyle)
-	if err != nil {
+	if err := quick.Highlight(&b, cmd.Command, chromaLang, chromaFormatter, chromaStyle); err != nil {
 		return err
 	}
 
@@ -97,12 +98,14 @@ func (dc *detailCommand) SetContent(cmd command.Command) error {
 		{labelStyle.Render("Command"), headerStyle.Render(b.String())},
 	}...))
 
+	style := lipgloss.NewStyle()
 	content := dc.contentStyle.
 		Render(
 			lipgloss.JoinVertical(
 				lipgloss.Top,
 				dc.infoTable.Render(),
-				dc.paramsTable.Render(),
+				style.MarginLeft(1).Render(labelStyle.Render("Parameters")),
+				style.MarginLeft(2).Render(dc.paramsTable.Render()),
 			),
 		)
 
@@ -110,11 +113,11 @@ func (dc *detailCommand) SetContent(cmd command.Command) error {
 	return nil
 }
 
-func (dc *detailCommand) View() string {
+func (dc *detailsView) View() string {
 	return dc.view.View()
 }
 
-func (dc *detailCommand) SetSize(width, height int) {
+func (dc *detailsView) SetSize(width, height int) {
 	dc.titleStyle.Width(width)
 
 	dc.view.Width, dc.view.Height = width, height

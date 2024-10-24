@@ -44,7 +44,6 @@ var (
 			Padding(0, 1).
 			Italic(true).
 			Foreground(lipgloss.Color("#FFF7DB"))
-		// Background(lipgloss.Color("#FF5F87"))
 
 	subtle = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
 )

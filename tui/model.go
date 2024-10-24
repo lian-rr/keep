@@ -20,8 +20,8 @@ type model struct {
 	logger *slog.Logger
 
 	// panels
-	commands   commandList
-	detailView detailCommand
+	commands   listView
+	detailView detailsView
 	help       help.Model
 
 	currentMode mode
@@ -36,7 +36,7 @@ func newModel(ctx context.Context, manager manager, logger *slog.Logger) (*model
 		return nil, err
 	}
 
-	detail := newDetailCommand(logger)
+	detail := newDetailsView(logger)
 	if len(cmds) > 0 {
 		cmd, err := manager.GetOne(ctx, cmds[0].ID.String())
 		if err != nil {
@@ -51,7 +51,7 @@ func newModel(ctx context.Context, manager manager, logger *slog.Logger) (*model
 		commandManager: manager,
 		titleStyle:     titleStyle,
 		keys:           defaultKeyMap,
-		commands:       newCommandList("Commands", cmds),
+		commands:       newListView("Commands", cmds),
 		detailView:     detail,
 		help:           help.New(),
 		currentMode:    navigationMode,

@@ -9,47 +9,47 @@ import (
 	"github.com/lian_rr/keep/command"
 )
 
-type commandList struct {
+type listView struct {
 	list list.Model
 }
 
-func newCommandList(title string, commands []command.Command) commandList {
+func newListView(title string, commands []command.Command) listView {
 	items := make([]list.Item, 0, len(commands))
 	for _, cmd := range commands {
-		items = append(items, &commandItem{
+		items = append(items, &listItem{
 			title: cmd.Name,
 			desc:  cmd.Description,
 			cmd:   &cmd,
 		})
 	}
 
-	listView := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	listView.Title = title
-	listView.DisableQuitKeybindings()
-	listView.SetFilteringEnabled(false)
-	listView.SetShowHelp(false)
+	view := list.New(items, list.NewDefaultDelegate(), 0, 0)
+	view.Title = title
+	view.DisableQuitKeybindings()
+	view.SetFilteringEnabled(false)
+	view.SetShowHelp(false)
 
-	return commandList{
-		list: listView,
+	return listView{
+		list: view,
 	}
 }
 
-func (l *commandList) Update(msg tea.Msg) (commandList, tea.Cmd) {
+func (l *listView) Update(msg tea.Msg) (listView, tea.Cmd) {
 	var cmd tea.Cmd
 	l.list, cmd = l.list.Update(msg)
 	return *l, cmd
 }
 
-func (l commandList) View() string {
+func (l listView) View() string {
 	return containerStyle.Render(l.list.View())
 }
 
-func (l *commandList) SetSize(w, h int) {
+func (l *listView) SetSize(w, h int) {
 	l.list.SetSize(w, h)
 }
 
-func (l *commandList) selectedItem() (*commandItem, error) {
-	command, ok := l.list.SelectedItem().(*commandItem)
+func (l *listView) selectedItem() (*listItem, error) {
+	command, ok := l.list.SelectedItem().(*listItem)
 	if !ok {
 		return nil, errors.New("invalid item selected")
 	}
@@ -57,23 +57,23 @@ func (l *commandList) selectedItem() (*commandItem, error) {
 	return command, nil
 }
 
-type commandItem struct {
+type listItem struct {
 	title  string
 	desc   string
 	cmd    *command.Command
 	loaded bool
 }
 
-var _ list.Item = (*commandItem)(nil)
+var _ list.Item = (*listItem)(nil)
 
-func (i commandItem) Title() string {
+func (i listItem) Title() string {
 	return i.title
 }
 
-func (i commandItem) Description() string {
+func (i listItem) Description() string {
 	return i.desc
 }
 
-func (i commandItem) FilterValue() string {
+func (i listItem) FilterValue() string {
 	return i.title
 }
